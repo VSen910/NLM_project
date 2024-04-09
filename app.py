@@ -40,27 +40,64 @@ def get_sql_query_chain(db):
 
     prompt = PromptTemplate.from_template(prompt_template)
 
-    def get_schema(_):
-        return db.get_table_info()
+    repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
+    llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.1)
 
     return (
-        RunnablePassthrough.assign(schema=get_schema) |
+        RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
         prompt |
         llm |
         StrOutputParser()
     )
 
-# def get_response(question, db):
+def get_results(question, db):
+    prompt_template = """
+        You are an expert in MySQL. You have been given a SQL database about a bakery whose schema is given below.
+        Given the user's question, the SQL query and the SQL response, generate a natural language response for the user.
+        
+        The schema of the database:
+        {schema}
+        
+        User's question: {question}
+        SQL query: {sql_query}
+        SQL response: {sql_response}
+        Natural language response:
+    """
 
+    prompt = PromptTemplate.from_template(prompt_template)
+
+    repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
+    llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.3)
+
+    sql_query = get_sql_query_chain(db)
+
+    chain = (
+        RunnablePassthrough.assign(sql_query=sql_query).assign(
+            schema=lambda _: db.get_table_info(),
+            sql_response=lambda vars: db.run(vars['sql_query'])
+        ) |
+        prompt |
+        llm |
+        StrOutputParser()
+    )
+
+    return chain.invoke({'question': question})
 
 
 load_dotenv()
 
-repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
-llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.1)
-
 db = init_db(user=os.environ.get('USER'), password=os.environ.get('PASSWORD'), host=os.environ.get('HOST'),
         port=os.environ.get('PORT'), db_name=os.environ.get('DB_NAME'))
 
-response = get_sql_query_chain(db).invoke({'question': 'who are the customers who bought something on the 9 oct 2007'})
+# response = get_sql_query_chain(db).invoke({
+#     'question': 'who are the customers who bought something on the 9 oct 2007'
+# })
+# print(response)
+
+# print(get_sql_query_chain(db).invoke({
+#     'question': 'who are the unique customers who bought something on the 9-Oct-2007'
+#     })
+# )
+
+response = get_results(question='who are the unique customers who bought something on the 9-Oct-2007', db=db)
 print(response)
