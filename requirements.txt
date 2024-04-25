@@ -1,3 +1,4 @@
+streamlit
 langchain
 mysql-connector-python
 python-dotenv

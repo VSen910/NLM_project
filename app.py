@@ -2,9 +2,10 @@ import os
 import sys
 
 import pandas as pd
+import streamlit as st
 
+from pandasai import Agent
 from dotenv import load_dotenv
-from pandasai import SmartDataframe
 from sqlalchemy import create_engine, text
 from langchain.prompts import PromptTemplate
 from langchain_community.utilities import SQLDatabase
@@ -174,13 +175,23 @@ def get_results(question, db):
 #
 #     return chain.invoke({'comments': comments})
 
-def data_qna(df, question):
+def get_agent(df):
     repo_id = "mistralai/Mixtral-8x7B-Instruct-v0.1"
     llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.1)
 
-    sdf = SmartDataframe(df, config={'llm': llm})
+    agent = Agent(df, config={'llm': llm})
+    return agent
 
-    print(sdf.chat(question))
+def data_qna(df):
+    repo_id = "mistralai/Mixtral-8x7B-Instruct-v0.1"
+    llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.1)
+
+    agent = Agent(df, config={'llm': llm})
+    if os.path.exists('./exports/charts/temp_chart.png'):
+        st.image('./exports/charts/temp_chart.png')
+        os.remove('./exports/charts/temp_chart.png')
+    else:
+        st.write(agent.chat(question2))
 
 
 load_dotenv()
@@ -195,26 +206,46 @@ db = init_db(user=user, password=password, host=host, port=port, db_name=db_name
 
 sql_query = ''
 sql_response = ''
+results = ''
 
-results = get_results(question='get the top 10 users with posts having the most likes', db=db)
+st.title('Social media analytics tool')
+question = st.text_area('Ask your query')
 
-print(results)
-print()
-print(f'SQL query: {sql_query}')
-print()
+if len(question.strip()) != 0:
+    results = get_results(question=question, db=db)
+    st.write(results.strip())
+    st.write(f'SQL query: {sql_query}')
 
-engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}:{port}/{db_name}').connect()
-df = pd.read_sql(text(sql_query), engine)
-print(df)
+    engine = create_engine(f'mysql+mysqlconnector://{user}:{password}@{host}:{port}/{db_name}').connect()
+    df = pd.read_sql(text(sql_query), engine)
+    print(df)
 
-if df.empty is False:
-    cont = int(input('Wish to continue? 1. Yes 2. No\n'))
-    if cont == 1:
-        while True:
-            question = input('Ask questions to your data or generate graphs and charts\n')
-            if question == '/quit':
-                break
-            data_qna(df, question)
+    st.write(df)
+
+    if df.empty is False:
+        question2 = st.text_area('Ask questions to your data or generate graphs and charts', key='q2')
+        if len(question2.strip()) != 0:
+            agent = get_agent(df)
+            res = agent.chat(question2)
+            if os.path.exists('./exports/charts/temp_chart.png'):
+                st.image('./exports/charts/temp_chart.png')
+                os.remove('./exports/charts/temp_chart.png')
+            else:
+                st.write(res)
+
+# print(results)
+# print()
+# print(f'SQL query: {sql_query}')
+# print()
+# if df.empty is False:
+#     cont = int(input('Wish to continue? 1. Yes 2. No\n'))
+#     if cont == 1:
+#         while True:
+#             question = input('Ask questions to your data or generate graphs and charts\n')
+#             if question == '/quit':
+#                 break
+#             print(data_qna(df, question))
+
 
 # rec = get_dv_rec(db=db, query=sql_query, response=sql_response)
 # print(rec)
