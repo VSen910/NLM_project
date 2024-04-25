@@ -1,4 +1,6 @@
 import os
+import sys
+
 import pandas as pd
 
 from dotenv import load_dotenv
@@ -93,6 +95,11 @@ def get_results(question, db):
     global sql_response
     sql_query = get_sql_query_chain(db).invoke({'question': question})
     sql_response = db.run(sql_query)
+
+    if len(sql_response.strip()) == 0:
+        print('No SQL query received')
+        print('Exiting the program')
+        sys.exit()
 
     chain = (
         RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
