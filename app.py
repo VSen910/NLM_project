@@ -62,10 +62,10 @@ def get_sql_query_chain(db):
     llm = HuggingFaceEndpoint(repo_id=repo_id, temperature=0.08)
 
     return (
-            RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
-            prompt |
-            llm |
-            StrOutputParser()
+        RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
+        prompt |
+        llm |
+        StrOutputParser()
     )
 
 
@@ -95,10 +95,10 @@ def get_results(question, db):
     sql_response = db.run(sql_query)
 
     chain = (
-            RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
-            prompt |
-            llm |
-            StrOutputParser()
+        RunnablePassthrough.assign(schema=lambda _: db.get_table_info()) |
+        prompt |
+        llm |
+        StrOutputParser()
     )
 
     return chain.invoke({'question': question, 'sql_query': sql_query, 'sql_response': sql_response})
@@ -205,6 +205,8 @@ if df.empty is False:
     if cont == 1:
         while True:
             question = input('Ask questions to your data or generate graphs and charts\n')
+            if question == '/quit':
+                break
             data_qna(df, question)
 
 # rec = get_dv_rec(db=db, query=sql_query, response=sql_response)
